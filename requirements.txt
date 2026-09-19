@@ -1,0 +1,24 @@
+# Simulation & RL Environment
+pygame>=2.5.0
+gymnasium>=0.29.0
+
+# Deep Reinforcement Learning
+torch>=2.2.0
+stable-baselines3>=2.3.0
+tensorboard>=2.16.0
+
+# Data Validation & Serialization
+pydantic>=2.7.0
+numpy>=1.26.0
+
+# Vector Database & RAG
+chromadb>=0.5.0
+sentence-transformers>=3.0.0
+
+# LLM Interface & Prompting
+requests>=2.31.0
+ollama>=0.2.0
+
+# Dashboard & Visualization
+streamlit>=1.35.0
+matplotlib>=3.8.0
