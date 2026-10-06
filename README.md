@@ -80,7 +80,7 @@ xai-game-agent/
 
 ---
 
-## 🚀 Setup & Installation
+## Setup & Installation
 
 ### 1. Prerequisites
 
@@ -125,7 +125,7 @@ python -c "from env.gym_wrapper import CombatArenaEnv; from gymnasium.utils.env_
 
 ## 👥 Contributors
 
-* **Prathamesh Chalak** (Reg. No: `24BCT0286`)
+* **Prathamesh Chalak** (`24BCT0286`)
 
 
-* **Sourish Dutta** (Reg. No: `24BCT0282`)
+* **Sourish Dutta** (`24BCT0282`)
