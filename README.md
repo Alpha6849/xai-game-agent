@@ -80,7 +80,7 @@ xai-game-agent/
 
 ---
 
-## Setup & Installation
+## 📦 Installation
 
 ### 1. Prerequisites
 
