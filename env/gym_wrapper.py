@@ -198,3 +198,6 @@ class CombatArenaEnv(gym.Env):
             pygame.quit()
             self.window = None
             self.clock = None
+            
+            
+GymArenaEnv = CombatArenaEnv

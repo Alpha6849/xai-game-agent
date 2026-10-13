@@ -222,3 +222,7 @@ logs/
 checkpoints/
 *.pth
 *.zip
+
+checkpoints/*.zip
+tensorboard_logs/
+data/telemetry/*.json
