@@ -2,6 +2,7 @@
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
+import pygame
 
 from env.arena import ACTION_NAMES, AGENT_COOLDOWN, AGENT_MAX_AMMO, ArenaSimulation
 
@@ -143,28 +144,44 @@ class CombatArenaEnv(gym.Env):
     def render(self):
         if self.render_mode is None:
             return None
-        import pygame
+
+        if not pygame.get_init():
+            pygame.init()
+        if not pygame.font.get_init():
+            pygame.font.init()
 
         sim = self.sim
         canvas = pygame.Surface((sim.width, sim.height))
         canvas.fill((230, 230, 235))
+
         for obstacle in sim.obstacles:
             obstacle.draw(canvas)
+
         pygame.draw.line(canvas, (80, 200, 100) if sim.los else (220, 90, 90),
                          tuple(map(int, sim.agent_pos)), tuple(map(int, sim.opp_pos)), 1)
         pygame.draw.circle(canvas, (0, 190, 190), tuple(map(int, sim.cover_point)), 5, 2)
+
         for projectile in sim.projectiles:
             projectile.draw(canvas)
+
         pygame.draw.circle(canvas, (40, 120, 240), tuple(map(int, sim.agent_pos)), 14)
         pygame.draw.circle(canvas, (240, 60, 60), tuple(map(int, sim.opp_pos)), 14)
+
         for position, health, color in ((sim.agent_pos, sim.agent_health, (40, 120, 240)),
                                         (sim.opp_pos, sim.opp_health, (240, 60, 60))):
             x, y = int(position[0]) - 15, int(position[1]) - 26
             pygame.draw.rect(canvas, (60, 60, 60), (x, y, 30, 5))
             pygame.draw.rect(canvas, color, (x, y, int(30 * max(health, 0) / 100), 5))
+
+        # HUD text display matching report design
+        hud_font = pygame.font.SysFont(None, 22)
+        agent_hud = hud_font.render(f"Agent HP: {int(sim.agent_health)} | Ammo: {sim.agent_ammo}", True, (20, 20, 20))
+        opp_hud = hud_font.render(f"Opponent HP: {int(sim.opp_health)}", True, (180, 20, 20))
+        canvas.blit(agent_hud, (15, 15))
+        canvas.blit(opp_hud, (sim.width - 160, 15))
+
         if self.render_mode == "human":
             if self.window is None:
-                pygame.init()
                 self.window = pygame.display.set_mode((sim.width, sim.height))
                 pygame.display.set_caption("XAI Combat Arena")
                 self.clock = pygame.time.Clock()
@@ -177,7 +194,6 @@ class CombatArenaEnv(gym.Env):
 
     def close(self):
         if self.window is not None:
-            import pygame
             pygame.display.quit()
             pygame.quit()
             self.window = None

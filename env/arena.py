@@ -46,8 +46,12 @@ class Projectile:
         if not (0 <= self.x <= width and 0 <= self.y <= height):
             self.active = False
             return
-        rect = pygame.Rect(int(self.x - self.radius), int(self.y - self.radius),
-                           self.radius * 2, self.radius * 2)
+        rect = pygame.Rect(
+            int(self.x - self.radius),
+            int(self.y - self.radius),
+            self.radius * 2,
+            self.radius * 2,
+        )
         if any(o.rect.colliderect(rect) for o in obstacles):
             self.active = False
 
@@ -63,8 +67,11 @@ class ArenaSimulation:
         if self.width <= 2 * WALL_MARGIN or self.height <= 2 * WALL_MARGIN:
             raise ValueError("Arena dimensions must be greater than twice WALL_MARGIN")
         self.rng = rng if rng is not None else np.random.default_rng()
-        self.obstacles = [Obstacle(250, 220, 100, 160), Obstacle(100, 100, 60, 60),
-                          Obstacle(440, 440, 60, 60)]
+        self.obstacles = [
+            Obstacle(250, 220, 100, 160),
+            Obstacle(100, 100, 60, 60),
+            Obstacle(440, 440, 60, 60),
+        ]
         self._cover_grid = self._build_cover_grid()
         if not len(self._cover_grid):
             raise ValueError("Arena has no free cover-grid positions")
@@ -123,12 +130,12 @@ class ArenaSimulation:
         self.cover_point, self.in_cover = self._find_cover()
 
     def _random_spawn(self, x_lo, x_hi):
-        # Search bounded spawn bands first; then use any free point in the arena.
         for lo, hi in ((x_lo, x_hi), (WALL_MARGIN, self.width - WALL_MARGIN)):
             for _ in range(500):
-                point = np.array([self.rng.uniform(lo, hi),
-                                  self.rng.uniform(WALL_MARGIN, self.height - WALL_MARGIN)],
-                                 dtype=np.float32)
+                point = np.array([
+                    self.rng.uniform(lo, hi),
+                    self.rng.uniform(WALL_MARGIN, self.height - WALL_MARGIN)
+                ], dtype=np.float32)
                 if self._free(point):
                     return point
         raise RuntimeError("Could not find a free entity spawn position")
@@ -158,8 +165,11 @@ class ArenaSimulation:
         self.projectiles.append(Projectile(*start, *direction, owner_id=owner_id))
 
     def nearest_threat(self):
-        threats = [np.array([p.x, p.y], dtype=np.float32) - self.agent_pos
-                   for p in self.projectiles if p.owner_id == 2 and p.active]
+        threats = [
+            np.array([p.x, p.y], dtype=np.float32) - self.agent_pos
+            for p in self.projectiles
+            if p.owner_id == 2 and p.active
+        ]
         return min(threats, key=lambda v: float(np.linalg.norm(v))) if threats else None
 
     def _agent_act(self, action, ev):
@@ -217,8 +227,10 @@ class ArenaSimulation:
         if self.los and distance < OPP_MAX_RANGE and self.opp_cooldown == 0:
             angle = float(self.rng.normal(0.0, OPP_AIM_NOISE))
             c, s = np.cos(angle), np.sin(angle)
-            aim = np.array([c * direction[0] - s * direction[1],
-                            s * direction[0] + c * direction[1]], dtype=np.float32)
+            aim = np.array([
+                c * direction[0] - s * direction[1],
+                s * direction[0] + c * direction[1]
+            ], dtype=np.float32)
             self._spawn_projectile(self.opp_pos, aim, 2)
             self.opp_cooldown = OPP_COOLDOWN
             ev["opp_fired"] = True
@@ -227,8 +239,14 @@ class ArenaSimulation:
         if not isinstance(action, (int, np.integer)) or not 0 <= int(action) < len(ACTION_NAMES):
             raise ValueError(f"Invalid action {action!r}; expected an integer from 0 to {len(ACTION_NAMES) - 1}")
         action = int(action)
-        events = {"agent_fired": False, "fired_blind": False, "invalid_shot": False,
-                  "opp_fired": False, "damage_dealt": 0.0, "damage_taken": 0.0}
+        events = {
+            "agent_fired": False,
+            "fired_blind": False,
+            "invalid_shot": False,
+            "opp_fired": False,
+            "damage_dealt": 0.0,
+            "damage_taken": 0.0
+        }
         self.tick += 1
         self.agent_cooldown = max(0, self.agent_cooldown - 1)
         self.opp_cooldown = max(0, self.opp_cooldown - 1)
