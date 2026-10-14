@@ -4,6 +4,15 @@ An explainable AI (XAI) framework pairing an autonomous 2D combat agent trained 
 
 ---
 
+## 📌 Project Status
+
+- **Module 1 — 2D Simulation & Gymnasium Wrapper (`env/`)**: ✅ Implemented & Verified
+- **Module 2 — PPO Policy & Actor-Critic Telemetry (`agent/`, `telemetry/`)**: ✅ Implemented & Verified
+- **Module 3 — Vector Store & Counterfactual RAG (`rag/`)**: 🚧 In Progress (Scaffolding)
+- **Module 4 — Interactive Explanation Dashboard (`ui/`)**: 📅 Planned (Scaffolding)
+
+---
+
 ## 📌 Overview
 
 Standard Deep Reinforcement Learning (DRL) policies are black-box function approximators: they execute complex tactical policies but cannot articulate their internal decision logic. Dumping raw game telemetry into Large Language Models (LLMs) leads to context window saturation and hallucinations.
@@ -13,21 +22,7 @@ This project resolves this transparency barrier by:
 1. Simulating a 2D adversarial combat arena wrapped in the Farama Gymnasium API.
 2. Training an autonomous decision-making agent using PPO via Stable-Baselines3.
 3. Logging runtime environment telemetry alongside internal actor-critic signals: value estimates $V(s)$, full action-probability distributions $\pi(a\vert{}s)$, and penultimate latent feature vectors.
-4. Utilizing a vector store (ChromaDB) and local LLM (via Ollama) to answer natural-language user queries with grounded, counterfactual explanations (e.g., explaining why an agent retreated instead of engaging).
-
----
-
-## 🏗️ System Architecture
-
-The pipeline consists of three decoupled components:
-
-1. **Simulation Engine (`env/`)**: Bounded 2D Pygame combat environment handling entity movement, line-of-sight raycasting, projectile resolution, and Gymnasium standardization.
-2. **Policy Learning Engine (`agent/`)**: PyTorch/Stable-Baselines3 PPO implementation featuring discrete action branching and dense reward shaping (damage dealt, defensive positioning, stalling penalties).
-3. **Explainability & XAI Engine (`telemetry/`, `rag/`, `ui/`)**:
-   - **Telemetry Logger**: Captures structured state-action tuples and internal network activations at sample steps and trigger events.
-   - **Vector Database**: ChromaDB collection storing serialized telemetry records and static game rule knowledge.
-   - **RAG Pipeline**: Cosine similarity retriever assembling prompt contexts with raw logged metrics to drive counterfactual deduction in local LLMs.
-   - **Dashboard**: Interactive user interface allowing evaluators to pause gameplay and inspect decisions.
+4. *(Planned — Module 3 & 4)* Utilizing a vector store (ChromaDB) and local LLM (via Ollama) to answer natural-language user queries with grounded, counterfactual explanations.
 
 ---
 
@@ -36,25 +31,23 @@ The pipeline consists of three decoupled components:
 ```text
 xai-game-agent/
 ├── env/
-│   ├── arena.py            # Pygame mechanics, entities, obstacle collisions
-│   └── gym_wrapper.py      # Gymnasium-compliant observation/action spaces
+│   ├── arena.py            # [Implemented] Pygame mechanics, entities, obstacle collisions
+│   └── gym_wrapper.py      # [Implemented] Gymnasium-compliant 16-dim obs / 7-action spaces
 ├── agent/
-│   ├── callbacks.py        # Custom SB3 callback extracting V(s) and π(a|s)
-│   ├── models.py           # Actor-Critic network definitions
-│   ├── record_session.py   # Ground-truth evaluation session recorder
-│   └── train.py            # PPO training pipeline and checkpointing
+│   ├── callbacks.py        # [Implemented] SB3 callback extracting V(s), π(a|s), latent vectors
+│   ├── models.py           # [Implemented] Actor-Critic MLP network definitions
+│   ├── record_session.py   # [Implemented] Ground-truth evaluation session recorder
+│   └── train.py            # [Implemented] PPO training pipeline and checkpointing
 ├── telemetry/
-│   ├── logger.py           # In-process frame-level JSON telemetry serializer
-│   └── schema.py           # Dataclass schemas for telemetry records
+│   ├── logger.py           # [Implemented] Frame-level JSON telemetry serializer
+│   └── schema.py           # [Implemented] Dataclass schemas for telemetry records
 ├── rag/
-│   ├── llm_client.py       # Ollama integration (Llama 3 / Mistral)
-│   ├── prompt_engine.py    # Structured counterfactual prompt synthesis
-│   └── retriever.py        # ChromaDB indexing and vector search routines
+│   ├── llm_client.py       # [Planned - Module 3] Ollama integration (Llama 3 / Mistral)
+│   ├── prompt_engine.py    # [Planned - Module 3] Counterfactual prompt synthesis
+│   └── retriever.py        # [Planned - Module 3] ChromaDB indexing and vector search
 ├── ui/
-│   └── dashboard.py        # Interactive Streamlit explanation console
-├── data/
-│   └── game_rules.json     # Static knowledge base of mechanics and rewards
-├── verify_telemetry.py     # Structural audit script for logged telemetry
+│   └── dashboard.py        # [Planned - Module 4] Interactive Streamlit explanation console
+├── verify_telemetry.py     # [Implemented] Full-corpus audit script for logged telemetry
 ├── requirements.txt
 └── README.md
 ```
@@ -63,17 +56,6 @@ xai-game-agent/
 
 ## 📦 Installation & Setup
 
-### 1. Prerequisites
-
-- Python 3.10+
-- [Ollama](https://ollama.ai/) installed and running locally with Llama 3 or Mistral:
-
-```bash
-ollama pull llama3:8b
-```
-
-### 2. Environment Setup
-
 ```bash
 # Clone the repository
 git clone [https://github.com/Alpha6849/xai-game-agent.git](https://github.com/Alpha6849/xai-game-agent.git)
@@ -81,12 +63,7 @@ cd xai-game-agent
 
 # Create and activate virtual environment
 python -m venv venv
-
-# Windows (PowerShell):
 .\venv\Scripts\Activate.ps1
-
-# Linux/macOS:
-# source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -105,13 +82,13 @@ python -c "from env.gym_wrapper import CombatArenaEnv; from gymnasium.utils.env_
 ### Step 2: Train Agent & Extract Telemetry (Module 2)
 
 ```bash
-# Train the PPO agent (saves checkpoints to ./checkpoints/ and logs to ./tensorboard_logs/)
+# Train the PPO agent
 python -m agent.train --steps 10000 --checkpoint-freq 10000
 
 # Run evaluation to generate the ground-truth actor-critic telemetry log
 python -m agent.record_session --model ./checkpoints/ppo_combat_agent_final.zip --episodes 2
 
-# Verify that internal signals (V(s), action distributions, latent vectors) were captured correctly
+# Audit all frames in the latest telemetry log for finite math, probability sums, and schema compliance
 python verify_telemetry.py
 ```
 
