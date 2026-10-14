@@ -11,7 +11,7 @@ Standard Deep Reinforcement Learning (DRL) policies function as uninterpretable 
 This framework resolves the interpretability challenge through three architectural mechanisms:
 * **Decoupled Simulation & Telemetry Logging:** The agent interacts synchronously with the Pygame/Gymnasium environment while runtime telemetry is captured via non-blocking callbacks.
 * **Actor-Critic Signal Extraction:** The logger captures intermediate internal network activations alongside environment state: the critic's state-value estimate $V(s)$, the complete policy action-probability distribution $\pi(a\vert{}s)$, and the penultimate latent feature vector (128-d).
-* **Counterfactual RAG Grounding:** A ChromaDB vector database stores serialized frame summaries and static mechanics rules. The prompt engine dynamically extracts the highest-probability rejected action ($\arg\max_{a \neq a_{\text{chosen}}} \pi(a\vert{}s)$) to force the LLM to contrast chosen vs. unchosen actions using logged numerical evidence.
+* **Counterfactual RAG Grounding:** A ChromaDB vector database stores serialized frame summaries and static mechanics rules. The prompt engine dynamically extracts the highest-probability rejected action (argmax over rejected actions π(a|s)) to force the LLM to contrast chosen vs. unchosen actions using logged numerical evidence.
 
 ---
 
@@ -206,7 +206,7 @@ streamlit run ui/dashboard.py
 Access the dashboard at `http://localhost:8501`.
 
 ### Step 6: Run Quantitative Evaluation Suite
-Benchmark retrieval latency, top-$k$ recall, and factual faithfulness:
+Benchmark retrieval latency, top-k recall, and factual faithfulness:
 ```bash
 python evaluate_system.py
 ```
