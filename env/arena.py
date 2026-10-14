@@ -64,8 +64,10 @@ class Projectile:
 class ArenaSimulation:
     def __init__(self, width=600, height=600, rng=None):
         self.width, self.height = int(width), int(height)
-        if self.width <= 2 * WALL_MARGIN or self.height <= 2 * WALL_MARGIN:
-            raise ValueError("Arena dimensions must be greater than twice WALL_MARGIN")
+        if self.width < 420 or self.height < 420:
+            raise ValueError(
+                "Arena width and height must be at least 420 pixels to support obstacle and spawn margins."
+            )
         self.rng = rng if rng is not None else np.random.default_rng()
         self.obstacles = [
             Obstacle(250, 220, 100, 160),

@@ -1,3 +1,6 @@
+         
+
+
 """Gymnasium interface for the 2D combat arena."""
 import numpy as np
 import gymnasium as gym
@@ -20,7 +23,7 @@ INVALID_SHOT_PENALTY = -0.01
 BLIND_SHOT_PENALTY = -0.02
 DEFENSE_BONUS = 0.02
 DEFENSE_BUDGET = 1.0
-LOW_HEALTH = 40.0
+LOW_HEALTH_THRESHOLD = 40.0  # 40% HP threshold for defense bonus and telemetry flag
 WIN_REWARD = 5.0
 LOSS_REWARD = -5.0
 
@@ -94,7 +97,7 @@ class CombatArenaEnv(gym.Env):
             "defense": 0.0,
             "terminal": 0.0,
         }
-        if (self.sim.agent_health <= LOW_HEALTH and not self.sim.los
+        if (self.sim.agent_health <= LOW_HEALTH_THRESHOLD and not self.sim.los
                 and self._defense_paid < DEFENSE_BUDGET):
             bonus = min(DEFENSE_BONUS, DEFENSE_BUDGET - self._defense_paid)
             components["defense"] = bonus
@@ -136,7 +139,7 @@ class CombatArenaEnv(gym.Env):
             "distance_to_opp": sim.distance(),
             "has_line_of_sight": bool(sim.los),
             "in_cover": bool(sim.in_cover),
-            "is_low_health": bool(sim.agent_health <= 30.0),
+            "is_low_health": bool(sim.agent_health <= LOW_HEALTH_THRESHOLD),
             "incoming_projectiles": sum(1 for p in sim.projectiles if p.owner_id == 2),
             "last_action": None if self._last_action is None else ACTION_NAMES[self._last_action],
         }
@@ -198,6 +201,5 @@ class CombatArenaEnv(gym.Env):
             pygame.quit()
             self.window = None
             self.clock = None
-            
             
 GymArenaEnv = CombatArenaEnv
