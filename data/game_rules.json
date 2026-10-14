@@ -1,0 +1,58 @@
+{
+  "arena_specification": {
+    "dimensions": [600, 600],
+    "max_agent_health": 100,
+    "max_agent_ammo": 30,
+    "low_health_threshold": 30,
+    "cover_mechanic": "Blocks line-of-sight raycasts and projectile trajectories 100%."
+  },
+  "action_space": {
+    "0": {
+      "name": "Move North",
+      "type": "movement",
+      "description": "Translates agent position upward."
+    },
+    "1": {
+      "name": "Move South",
+      "type": "movement",
+      "description": "Translates agent position downward."
+    },
+    "2": {
+      "name": "Move East",
+      "type": "movement",
+      "description": "Translates agent position rightward."
+    },
+    "3": {
+      "name": "Move West",
+      "type": "movement",
+      "description": "Translates agent position leftward."
+    },
+    "4": {
+      "name": "Shoot",
+      "type": "combat",
+      "description": "Discharges a projectile toward the opponent along line of sight. Consumes 1 ammo."
+    },
+    "5": {
+      "name": "Move to Cover",
+      "type": "tactical",
+      "description": "Navigates agent toward the nearest defensible barrier to break line of sight."
+    },
+    "6": {
+      "name": "Retreat",
+      "type": "tactical",
+      "description": "Moves agent directly away from the opponent to increase distance."
+    }
+  },
+  "reward_function_weights": {
+    "winning_episode": 10.0,
+    "losing_episode": -10.0,
+    "landing_hit": 0.5,
+    "taking_damage": -0.2,
+    "defensible_position_at_low_health": 0.3,
+    "stalling_penalty_per_step": -0.01
+  },
+  "policy_signals_explanation": {
+    "V_s": "Critic state-value estimate V(s) represents expected cumulative discounted reward from current state. Negative values indicate disadvantageous states.",
+    "pi_a_s": "Actor probability distribution pi(a|s) across all 7 discrete actions. Represents the policy's preference confidence at that exact decision frame."
+  }
+}
