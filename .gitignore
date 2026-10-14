@@ -228,3 +228,4 @@ checkpoints/
 checkpoints/*.zip
 tensorboard_logs/
 data/telemetry/*.json
+data/evaluation_report.json
