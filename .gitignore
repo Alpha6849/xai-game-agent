@@ -218,6 +218,8 @@ __marimo__/
 
 # Project specific ignores
 chroma_db/
+chromadb/
+data/chromadb/
 logs/
 checkpoints/
 *.pth
