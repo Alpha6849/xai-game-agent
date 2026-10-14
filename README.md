@@ -1,100 +1,219 @@
-# Explainable Autonomous Game Agents Using Deep Reinforcement Learning and Retrieval-Augmented Generation (RAG)
+# 🛡️ Explainable Autonomous Game Agents Using DRL and RAG
 
-An explainable AI (XAI) framework pairing an autonomous 2D combat agent trained via Proximal Policy Optimization (PPO) with an in-situ, counterfactual Retrieval-Augmented Generation (RAG) engine.
-
----
-
-## 📌 Project Status
-
-- **Module 1 — 2D Simulation & Gymnasium Wrapper (`env/`)**: ✅ Implemented & Verified
-- **Module 2 — PPO Policy & Actor-Critic Telemetry (`agent/`, `telemetry/`)**: ✅ Implemented & Verified
-- **Module 3 — Vector Store & Counterfactual RAG (`rag/`)**: 🚧 In Progress (Scaffolding)
-- **Module 4 — Interactive Explanation Dashboard (`ui/`)**: 📅 Planned (Scaffolding)
+An end-to-end Explainable Artificial Intelligence (XAI) framework that connects sub-symbolic policy optimization with symbolic natural-language reasoning. The system trains an autonomous combat agent in a custom 2D arena using Proximal Policy Optimization (PPO), intercepts intermediate Actor-Critic representations, and utilizes a Retrieval-Augmented Generation (RAG) pipeline over ChromaDB to provide grounded, hallucination-resistant counterfactual explanations via a local Large Language Model.
 
 ---
 
-## 📌 Overview
+## 📌 System Overview & Problem Statement
 
-Standard Deep Reinforcement Learning (DRL) policies are black-box function approximators: they execute complex tactical policies but cannot articulate their internal decision logic. Dumping raw game telemetry into Large Language Models (LLMs) leads to context window saturation and hallucinations.
+Standard Deep Reinforcement Learning (DRL) policies function as uninterpretable black boxes. Feeding raw numerical telemetry into general-purpose LLMs overflows context windows and causes hallucinations.
 
-This project resolves this transparency barrier by:
+This framework resolves the interpretability challenge through three architectural mechanisms:
+* **Decoupled Simulation & Telemetry Logging:** The agent interacts synchronously with the Pygame/Gymnasium environment while runtime telemetry is captured via non-blocking callbacks.
+* **Actor-Critic Signal Extraction:** The logger captures intermediate internal network activations alongside environment state: the critic's state-value estimate $V(s)$, the complete policy action-probability distribution $\pi(a\vert{}s)$, and the penultimate latent feature vector (128-d).
+* **Counterfactual RAG Grounding:** A ChromaDB vector database stores serialized frame summaries and static mechanics rules. The prompt engine dynamically extracts the highest-probability rejected action (argmax over rejected actions π(a|s)) to force the LLM to contrast chosen vs. unchosen actions using logged numerical evidence.
 
-1. Simulating a 2D adversarial combat arena wrapped in the Farama Gymnasium API.
-2. Training an autonomous decision-making agent using PPO via Stable-Baselines3.
-3. Logging runtime environment telemetry alongside internal actor-critic signals: value estimates $V(s)$, full action-probability distributions $\pi(a\vert{}s)$, and penultimate latent feature vectors.
-4. *(Planned — Module 3 & 4)* Utilizing a vector store (ChromaDB) and local LLM (via Ollama) to answer natural-language user queries with grounded, counterfactual explanations.
+---
+
+## 🏗️ System Architecture
+
+```
++------------------------------------------------------------------------------------+
+|                                SYSTEM ARCHITECTURE                                 |
++------------------------------------------------------------------------------------+
+|                                                                                    |
+|  +--------------------+        Observation        +-----------------------------+  |
+|  |  Module 1: Arena   | ------------------------> |   Module 2: DRL Engine      |  |
+|  |  2D Pygame Sim     | <------------------------ |   PPO Actor-Critic (SB3)    |  |
+|  |  Gymnasium API     |       Sampled Action      |   - Policy Net: pi(a|s)     |  |
+|  +--------------------+                           |   - Critic Net: V(s)        |  |
+|           |                                       |   - Latent Vector (128-d)   |  |
+|           |                                       +-----------------------------+  |
+|           | State Snapshot                       Internal Tensors|                 |
+|           +-----------------------+------------------------------+                 |
+|                                   |                                                |
+|                                   v                                                |
+|           +------------------------------------------------------+                 |
+|           |        Module 3: Telemetry & Vector Store            |                 |
+|           |  - JSON Serialization / Sentence Embeddings          |                 |
+|           |  - ChromaDB Persistent Store (Cosine Metric)         |                 |
+|           |  - Static Game Rules Knowledge Base                  |                 |
+|           +------------------------------------------------------+                 |
+|                                   |                                                |
+|                                   | Retrieved Context Window                       |
+|                                   v                                                |
+|           +------------------------------------------------------+                 |
+|           |        Counterfactual RAG Engine                     |                 |
+|           |  - Dynamic Action Contrast: Chosen vs. Top Rejected  |                 |
+|           |  - Local Ollama Inference (Llama 3 / Mistral)        |                 |
+|           +------------------------------------------------------+                 |
+|                                   |                                                |
+|                                   v Grounded Explanation & Latency                 |
+|           +------------------------------------------------------+                 |
+|           |   Module 4: Explanation Dashboard (Streamlit)        |                 |
+|           |  - Interactive Step & Trigger Event Filtering        |                 |
+|           |  - Real-Time Action Distribution Visualizer (Plotly) |                 |
+|           |  - Automated Numerical Faithfulness Auditing         |                 |
+|           +------------------------------------------------------+                 |
++------------------------------------------------------------------------------------+
+```
 
 ---
 
 ## 📁 Repository Structure
 
-```text
+```
 xai-game-agent/
-├── env/
-│   ├── arena.py            # [Implemented] Pygame mechanics, entities, obstacle collisions
-│   └── gym_wrapper.py      # [Implemented] Gymnasium-compliant 16-dim obs / 7-action spaces
 ├── agent/
-│   ├── callbacks.py        # [Implemented] SB3 callback extracting V(s), π(a|s), latent vectors
-│   ├── models.py           # [Implemented] Actor-Critic MLP network definitions
-│   ├── record_session.py   # [Implemented] Ground-truth evaluation session recorder
-│   └── train.py            # [Implemented] PPO training pipeline and checkpointing
-├── telemetry/
-│   ├── logger.py           # [Implemented] Frame-level JSON telemetry serializer
-│   └── schema.py           # [Implemented] Dataclass schemas for telemetry records
+│   ├── __init__.py
+│   ├── callbacks.py          # TelemetryRecorderCallback extracting V(s), pi(a|s), and latents
+│   ├── models.py             # Actor-Critic network configuration with 128-unit layers
+│   ├── record_session.py     # Rollout script recording evaluation sessions to JSON
+│   └── train.py              # PPO training pipeline with TensorBoard logging
+├── data/
+│   ├── chromadb/             # Persistent ChromaDB vector database files
+│   ├── game_rules.json       # Domain knowledge base (actions, mechanics, reward weights)
+│   └── telemetry/            # Runtime JSON session telemetry logs
+├── env/
+│   ├── __init__.py
+│   ├── arena.py              # 2D Pygame simulation, raycasting LOS, combat logic
+│   └── gym_wrapper.py        # Farama Gymnasium wrapper (observation & action spaces)
 ├── rag/
-│   ├── llm_client.py       # [Planned - Module 3] Ollama integration (Llama 3 / Mistral)
-│   ├── prompt_engine.py    # [Planned - Module 3] Counterfactual prompt synthesis
-│   └── retriever.py        # [Planned - Module 3] ChromaDB indexing and vector search
+│   ├── __init__.py
+│   ├── llm_client.py         # Local Ollama client with deterministic decoding
+│   ├── prompt_engine.py      # Counterfactual prompt template enforcing 4-part structure
+│   └── retriever.py          # Frame serializer, ChromaDB indexing, and hybrid search
+├── telemetry/
+│   ├── __init__.py
+│   ├── logger.py             # Buffered session logger writing standardized JSON records
+│   └── schema.py             # TelemetryFrame schema definition and data validation
 ├── ui/
-│   └── dashboard.py        # [Planned - Module 4] Interactive Streamlit explanation console
-├── verify_telemetry.py     # [Implemented] Full-corpus audit script for logged telemetry
+│   ├── __init__.py
+│   └── dashboard.py          # Streamlit evaluation dashboard and HUD inspector
+├── documentation_and_abstract/
+│   ├── Abstract.pdf
+│   └── Entire_paper.pdf
+├── evaluate_system.py        # Automated benchmarking suite (latency, recall, faithfulness)
+├── test_rag_pipeline.py      # End-to-end integration test harness
+├── verify_telemetry.py       # Corpus validation script auditing schema constraints
 ├── requirements.txt
+├── .gitignore
 └── README.md
 ```
 
 ---
 
+## ⚙️ Technical Specifications
+
+###  Observation Space (`spaces.Box(16,)`)
+* `obs[0:2]`: Agent position coordinates $(x, y)$ normalized to $[0, 1]$.
+* `obs[2:4]`: Relative opponent displacement $(\Delta x, \Delta y)$ normalized to $[-1, 1]$.
+* `obs[4]`: Euclidean distance to opponent normalized to $[0, 1]$.
+* `obs[5]`: Agent health ratio $[0, 1]$ with low-health threshold at $\le 0.40$.
+* `obs[6]`: Opponent health ratio $[0, 1]$.
+* `obs[7]`: Ammunition ratio $[0, 1]$ relative to 30-round maximum.
+* `obs[8]`: Weapon firing cooldown ratio $[0, 1]$.
+* `obs[9]`: Line-of-sight indicator flag (`1.0` if unobstructed, `0.0` if blocked).
+* `obs[10:12]`: Relative vector to nearest defensive cover barrier $(\Delta x, \Delta y)$.
+* `obs[12]`: Defensive cover flag (`1.0` if shielded behind cover, `0.0` if exposed).
+* `obs[13:15]`: Relative trajectory vector of nearest incoming threat projectile.
+* `obs[15]`: Incoming projectile threat active flag (`1.0` if threat present, `0.0` otherwise).
+
+###  Action Space (`spaces.Discrete(7)`)
+* `0`: Move North (Translates position upward)
+* `1`: Move South (Translates position downward)
+* `2`: Move East (Rightward translation)
+* `3`: Move West (Leftward translation)
+* `4`: Shoot (Discharges projectile along LOS; consumes 1 ammo)
+* `5`: Move to Cover (Navigates directly toward nearest barrier)
+* `6`: Retreat (Translates directly away from opponent)
+
+### ⚖️ Reward Shaping Function
+$$R_{\text{total}} = R_{\text{terminal}} + \sum R_{\text{shaping}}$$
+
+| Component | Trigger Condition | Weight |
+| :--- | :--- | :--- |
+| **Terminal Win** | Opponent eliminated | `+10.0` |
+| **Terminal Loss** | Agent eliminated | `-10.0` |
+| **Hit Landed** | Projectile connects with opponent | `+0.5` |
+| **Damage Incurred** | Agent struck by enemy projectile | `-0.2` |
+| **Defensive Cover** | Holding cover position when health $< 40\%$ | `+0.3` |
+| **Stalling Penalty** | Per-step penalty applied to prevent idling | `-0.01` |
+
+---
+
 ## 📦 Installation & Setup
 
+### 1. Prerequisites
+* Python 3.10 or 3.11
+* [Ollama](https://ollama.com/) running locally
+
+### 2. Environment Setup
 ```bash
-# Clone the repository
 git clone [https://github.com/Alpha6849/xai-game-agent.git](https://github.com/Alpha6849/xai-game-agent.git)
 cd xai-game-agent
 
-# Create and activate virtual environment
 python -m venv venv
-.\venv\Scripts\Activate.ps1
+# Windows PowerShell:
+.\venv\Scripts\activate
+# Linux / macOS:
+source venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
 ```
 
+### 3. Initialize Language Model
+Start Ollama and pull the target LLM:
+```bash
+ollama pull llama3
+```
+*(Optional lightweight alternative for low-spec CPU setups: `ollama pull qwen2.5:1.5b` or `ollama pull mistral`)*
+
 ---
 
-## 🚀 Execution & Verification
+## 🕹️ Execution Workflow
 
-### Step 1: Verify Gymnasium Arena (Module 1)
-
+### Step 1: Policy Training
+Train the agent using PPO with checkpointing and TensorBoard logging:
 ```bash
-python -c "from env.gym_wrapper import CombatArenaEnv; from gymnasium.utils.env_checker import check_env; env = CombatArenaEnv(); check_env(env.unwrapped); print('Gymnasium Check Passed!')"
+python -m agent.train
 ```
 
-### Step 2: Train Agent & Extract Telemetry (Module 2)
-
+### Step 2: Evaluation Rollout & Telemetry Recording
+Generate evaluation gameplay sessions and record Actor-Critic internal states:
 ```bash
-# Train the PPO agent
-python -m agent.train --steps 10000 --checkpoint-freq 10000
+python -m agent.record_session
+```
+*Output: Serialized JSON logs saved to `data/telemetry/session_<id>.json`.*
 
-# Run evaluation to generate the ground-truth actor-critic telemetry log
-python -m agent.record_session --model ./checkpoints/ppo_combat_agent_final.zip --episodes 2
-
-# Audit all frames in the latest telemetry log for finite math, probability sums, and schema compliance
+### Step 3: Telemetry Schema Audit
+Verify structural integrity, finite bounds, and probability sum invariants across all frames:
+```bash
 python verify_telemetry.py
 ```
 
+### Step 4: RAG Pipeline Integration Test
+Verify ChromaDB indexing, sub-second retrieval latency, and Llama 3 generation:
+```bash
+python test_rag_pipeline.py
+```
+
+### Step 5: Launch Explanation Dashboard
+Start the Streamlit interface for interactive step inspection and counterfactual queries:
+```bash
+streamlit run ui/dashboard.py
+```
+Access the dashboard at `http://localhost:8501`.
+
+### Step 6: Run Quantitative Evaluation Suite
+Benchmark retrieval latency, top-k recall, and factual faithfulness:
+```bash
+python evaluate_system.py
+```
+
 ---
 
-## 👥 Contributors
+## 👥 Authors & Academic Context
 
-- **Prathamesh Chalak** (`24BCT0286`)
-- **Sourish Dutta** (`24BCT0282`)
+* **Prathamesh Chalak** (Registration No: 24BCT0286) — School of Computer Science and Engineering, Vellore Institute of Technology, Vellore
+* **Sourish Dutta** (Registration No: 24BCT0282) — School of Computer Science and Engineering, Vellore Institute of Technology, Vellore
