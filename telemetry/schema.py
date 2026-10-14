@@ -1,5 +1,5 @@
 from dataclasses import dataclass, asdict
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import time
 
 ACTION_NAMES: Dict[int, str] = {
@@ -25,6 +25,9 @@ class TelemetryFrame:
     reward: float
     done: bool
     flags: Dict[str, bool]                 # e.g., is_low_health, in_cover, has_los
+    pre_action_state: Optional[Dict[str, Any]] = None
+    next_observation: Optional[List[float]] = None
+    transition_info: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

@@ -139,7 +139,8 @@ class TelemetryRetriever:
                 "ammo_count": int(round(float(obs[7]) * 30)) if len(obs) > 7 else 30,
                 "action_probabilities_json": json.dumps(probs),
                 "raw_frame_json": json.dumps({
-                    k: v for k, v in frame.items() if k != "latent_vector"
+                    k: v for k, v in frame.items()
+                    if k not in {"latent_vector", "pre_action_state", "next_observation", "transition_info"}
                 })
             }
 
@@ -168,7 +169,12 @@ class TelemetryRetriever:
         print(f"[Retriever] Indexed {count} frames from {os.path.basename(latest_file)}")
         return latest_file
 
-    def retrieve_by_step(self, step: int, window: int = 2) -> List[Dict[str, Any]]:
+    def retrieve_by_step(
+        self,
+        step: int,
+        window: int = 2,
+        session_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """
         Retrieves the exact target step alongside surrounding steps [step - window, step + window]
         for temporal context.
@@ -176,13 +182,15 @@ class TelemetryRetriever:
         min_step = max(0, step - window)
         max_step = step + window
 
+        filters = [
+            {"step": {"$gte": min_step}},
+            {"step": {"$lte": max_step}}
+        ]
+        if session_id is not None:
+            filters.append({"session_id": session_id})
+
         results = self.telemetry_collection.get(
-            where={
-                "$and": [
-                    {"step": {"$gte": min_step}},
-                    {"step": {"$lte": max_step}}
-                ]
-            },
+            where={"$and": filters},
             include=["documents", "metadatas"]
         )
 

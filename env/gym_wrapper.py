@@ -59,6 +59,25 @@ class CombatArenaEnv(gym.Env):
         self._last_action = None
         return self._get_obs(), self._get_info()
 
+    def capture_state(self):
+        """Capture all environment state needed to replay the next step."""
+        return {
+            "version": 1,
+            "simulation": self.sim.capture_state(),
+            "current_step": int(self.current_step),
+            "defense_paid": float(self._defense_paid),
+            "last_action": self._last_action,
+        }
+
+    def restore_state(self, state):
+        """Restore a state produced by capture_state()."""
+        if state.get("version") != 1:
+            raise ValueError("Unsupported or missing environment snapshot version")
+        self.sim.restore_state(state["simulation"])
+        self.current_step = int(state["current_step"])
+        self._defense_paid = float(state["defense_paid"])
+        self._last_action = state.get("last_action")
+
     def step(self, action):
         if not self.action_space.contains(action):
             raise ValueError(f"Invalid action {action!r}; expected a value in {self.action_space}")

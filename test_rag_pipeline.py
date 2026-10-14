@@ -4,7 +4,7 @@ from rag.llm_client import ExplainableRAGClient
 
 def main():
     print("=== Initializing Explainable RAG Pipeline (Module 3) ===")
-    rag_client = ExplainableRAGClient(model_name="llama3")
+    rag_client = ExplainableRAGClient(model_name="qwen3:4b")
 
     # 1. Ingest Static Game Rules
     rules_count = rag_client.retriever.ingest_game_rules("./data/game_rules.json")
@@ -42,7 +42,7 @@ def main():
     print(f"In Cover / LOS    : In-Cover={target_meta['in_cover']}, Has-LOS={target_meta['has_los']}")
     print(f"Probabilities     : {json.loads(target_meta['action_probabilities_json'])}")
 
-    print("\n--- GENERATED COUNTERFACTUAL EXPLANATION (LLAMA 3) ---")
+    print("\n--- GENERATED COUNTERFACTUAL EXPLANATION (QWEN3) ---")
     print(result["explanation"])
     print("=" * 70)
 

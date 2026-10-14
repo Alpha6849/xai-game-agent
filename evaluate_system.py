@@ -115,7 +115,7 @@ def main():
     print("  XAI GAME AGENT — QUANTITATIVE EVALUATION SUITE (MODULE 4)")
     print("=" * 72)
 
-    rag_client = ExplainableRAGClient(model_name="llama3")
+    rag_client = ExplainableRAGClient(model_name="qwen3:4b")
     rag_client.retriever.ingest_game_rules("./data/game_rules.json")
     latest_session = rag_client.retriever.ingest_latest_session("./data/telemetry")
     print(f"[Init] Loaded & Indexed Session: {os.path.basename(latest_session)}")
@@ -134,7 +134,7 @@ def main():
     print(f"  - Sub-Second Target (<1s)  : {'PASSED' if retrieval_metrics['sub_second_target_met'] else 'FAILED'}")
 
     # 2. Audit Counterfactual Explanation Faithfulness (2 representative steps to keep CPU runtime fast)
-    print("\n[2/2] Auditing Counterfactual Explanation Faithfulness (Llama 3)...")
+    print("\n[2/2] Auditing Counterfactual Explanation Faithfulness (Qwen3)...")
     faithfulness_metrics = evaluate_explanation_faithfulness(rag_client, test_steps=[10, 25])
 
     print(f"  - Explanations Audited     : {faithfulness_metrics['num_audited_explanations']}")

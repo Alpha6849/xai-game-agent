@@ -29,7 +29,8 @@ class TelemetryRecorderCallback(BaseCallback):
         action: int,
         reward: float,
         done: bool,
-        step_idx: int
+        step_idx: int,
+        pre_action_state=None
     ) -> TelemetryFrame:
         """
         Core signal extraction logic usable during training or manual rollouts.
@@ -80,7 +81,8 @@ class TelemetryRecorderCallback(BaseCallback):
             latent_vector=latent_vector,
             reward=float(reward),
             done=bool(done),
-            flags=flags
+            flags=flags,
+            pre_action_state=pre_action_state
         )
 
         self.recorded_frames.append(frame)

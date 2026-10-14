@@ -45,7 +45,7 @@ This framework resolves the interpretability challenge through three architectur
 |           +------------------------------------------------------+                 |
 |           |        Counterfactual RAG Engine                     |                 |
 |           |  - Dynamic Action Contrast: Chosen vs. Top Rejected  |                 |
-|           |  - Local Ollama Inference (Llama 3 / Mistral)        |                 |
+|           |  - Local Ollama Inference (Qwen3 / Mistral)        |                 |
 |           +------------------------------------------------------+                 |
 |                                   |                                                |
 |                                   v Grounded Explanation & Latency                 |
@@ -165,7 +165,7 @@ pip install -r requirements.txt
 ### 3. Initialize Language Model
 Start Ollama and pull the target LLM:
 ```bash
-ollama pull llama3
+ollama pull qwen3:4b
 ```
 *(Optional lightweight alternative for low-spec CPU setups: `ollama pull qwen2.5:1.5b` or `ollama pull mistral`)*
 
@@ -193,7 +193,7 @@ python verify_telemetry.py
 ```
 
 ### Step 4: RAG Pipeline Integration Test
-Verify ChromaDB indexing, sub-second retrieval latency, and Llama 3 generation:
+Verify ChromaDB indexing, sub-second retrieval latency, and Qwen3 generation:
 ```bash
 python test_rag_pipeline.py
 ```

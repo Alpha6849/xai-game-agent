@@ -13,6 +13,8 @@ if PROJECT_ROOT not in sys.path:
 
 from rag.llm_client import ExplainableRAGClient
 from rag.prompt_engine import CounterfactualPromptEngine
+from env.gym_wrapper import CombatArenaEnv
+from telemetry.schema import ACTION_NAMES
 
 
 st.set_page_config(
@@ -24,7 +26,7 @@ st.set_page_config(
 
 
 @st.cache_resource
-def init_rag_client(model_name: str = "llama3") -> ExplainableRAGClient:
+def init_rag_client(model_name: str = "qwen3:4b") -> ExplainableRAGClient:
     """Initializes the RAG client and indexes static game rules once per session."""
     client = ExplainableRAGClient(
         model_name=model_name,
@@ -48,11 +50,14 @@ def load_and_index_session(session_path: str):
     return frames
 
 
-def check_numerical_faithfulness(explanation: str, meta: dict, chosen_prob: float, alt_prob: float) -> dict:
+def check_required_citations(explanation: str, meta: dict, chosen_prob: float, alt_probabilities) -> dict:
     """
-    Audits whether the generated LLM explanation faithfully cites the logged ground-truth
-    figures (V(s), chosen probability, and alternative probability).
+    Checks whether selected logged values and labels appear in the generated text.
+    This is a citation-presence check, not a validation of the explanation's reasoning.
     """
+    def contains_number(value: str) -> bool:
+        return re.search(rf"(?<![\d.]){re.escape(value)}(?![\d.])", explanation) is not None
+
     v_s_val = meta.get("value_estimate", 0.0)
     v_s_str = f"{v_s_val:.4f}"
     v_s_short = f"{v_s_val:.2f}"
@@ -60,18 +65,28 @@ def check_numerical_faithfulness(explanation: str, meta: dict, chosen_prob: floa
     chosen_str_dec = f"{chosen_prob:.4f}"
     chosen_str_pct = f"{chosen_prob * 100:.1f}"
 
-    alt_str_dec = f"{alt_prob:.4f}"
-    alt_str_pct = f"{alt_prob * 100:.1f}"
-
-    has_v_s = (v_s_str in explanation) or (v_s_short in explanation)
-    has_chosen_p = (chosen_str_dec in explanation) or (chosen_str_pct in explanation)
-    has_alt_p = (alt_str_dec in explanation) or (alt_str_pct in explanation)
+    has_v_s = contains_number(v_s_str) or contains_number(v_s_short)
+    has_chosen_p = contains_number(chosen_str_dec) or contains_number(chosen_str_pct)
+    if not isinstance(alt_probabilities, (list, tuple)):
+        alt_probabilities = [alt_probabilities]
+    has_alt_p = bool(alt_probabilities) and all(
+        contains_number(f"{probability:.4f}") or contains_number(f"{probability * 100:.1f}")
+        for probability in alt_probabilities
+    )
+    step = meta.get("step")
+    has_step = step is not None and re.search(
+        rf"\bstep\s+`?{re.escape(str(step))}\b", explanation, re.IGNORECASE
+    ) is not None
+    chosen_name = meta.get("chosen_action_name", "")
+    has_chosen_action = bool(chosen_name) and chosen_name.casefold() in explanation.casefold()
 
     return {
+        "cites_step": has_step,
+        "cites_chosen_action": has_chosen_action,
         "cites_v_s": has_v_s,
         "cites_chosen_prob": has_chosen_p,
         "cites_alt_prob": has_alt_p,
-        "all_verified": has_v_s and has_chosen_p and has_alt_p
+        "all_required_figures_cited": all((has_step, has_chosen_action, has_v_s, has_chosen_p, has_alt_p))
     }
 
 
@@ -168,7 +183,7 @@ def main():
     # --- Main Header ---
     st.title("🛡️ Explainable Autonomous Game Agent (DRL + RAG)")
     st.markdown(
-        "**Interactive Policy Inspector & Counterfactual Explanation Engine** — "
+        "**Interactive Policy Inspector & Telemetry-Grounded Explanations** — "
         "Grounds natural-language explanations in PPO Actor-Critic signals $\\pi(a\vert{}s)$ and $V(s)$."
     )
 
@@ -263,10 +278,71 @@ def main():
         )
         st.plotly_chart(fig_timeline, use_container_width=True)
 
+    with st.expander("🧪 Replay one alternative action from this exact state", expanded=False):
+        pre_action_state = current_frame.get("pre_action_state")
+        alternative_names = [name for name in probs if name != chosen_name]
+        if not pre_action_state:
+            st.info("This session has no saved pre-action snapshots. Record a new session to enable replay.")
+        elif not alternative_names:
+            st.info("This frame has no alternative action probabilities to replay.")
+        else:
+            alternative_name = st.selectbox(
+                "Choose an unselected action to simulate for one step:",
+                options=alternative_names,
+                key="counterfactual_action"
+            )
+            st.caption(
+                "The replay starts from the saved simulator state and random-number state. "
+                "It compares one step only; it does not predict a full future episode."
+            )
+            if st.button("Run one-step replay", key="run_counterfactual_replay"):
+                action_id = next(
+                    (idx for idx, name in ACTION_NAMES.items() if name == alternative_name),
+                    None
+                )
+                replay_env = CombatArenaEnv()
+                try:
+                    if action_id is None:
+                        raise ValueError(f"Unknown action in telemetry: {alternative_name}")
+                    replay_env.restore_state(pre_action_state)
+                    simulated_obs, simulated_reward, terminated, truncated, replay_info = replay_env.step(action_id)
+
+                    st.write(f"**Simulated action:** {alternative_name}")
+                    actual_reward = float(current_frame.get("reward", 0.0))
+                    st.metric(
+                        "One-step reward",
+                        f"{simulated_reward:.4f}",
+                        delta=f"{simulated_reward - actual_reward:+.4f} vs logged action"
+                    )
+                    actual_obs = current_frame.get("next_observation")
+                    if actual_obs:
+                        actual_hp = float(actual_obs[5]) * 100
+                        actual_opp_hp = float(actual_obs[6]) * 100
+                        actual_ammo = float(actual_obs[7]) * 30
+                        alt_hp = float(simulated_obs[5]) * 100
+                        alt_opp_hp = float(simulated_obs[6]) * 100
+                        alt_ammo = float(simulated_obs[7]) * 30
+                        c1, c2, c3 = st.columns(3)
+                        c1.metric("Agent HP after step", f"{alt_hp:.1f}%", delta=f"{alt_hp - actual_hp:+.1f}% vs logged")
+                        c2.metric("Opponent HP after step", f"{alt_opp_hp:.1f}%", delta=f"{alt_opp_hp - actual_opp_hp:+.1f}% vs logged")
+                        c3.metric("Ammo after step", f"{alt_ammo:.0f}/30", delta=f"{alt_ammo - actual_ammo:+.0f} vs logged")
+                    st.write("**Simulated step events:**")
+                    st.json(replay_info.get("events", {}))
+                    if terminated or truncated:
+                        st.caption("The simulated step ended or reached the episode step limit.")
+                except Exception as exc:
+                    st.error(f"Could not replay this alternative action: {exc}")
+                finally:
+                    replay_env.close()
+
     st.divider()
 
     # --- Bottom Section: Counterfactual RAG Query Interface ---
-    st.subheader("💬 Counterfactual Explanation Engine (ChromaDB + Ollama Llama 3)")
+    st.subheader("💬 Telemetry-Grounded Explanation (ChromaDB + Ollama Qwen3)")
+    st.caption(
+        "The text explanation uses recorded policy and telemetry. The replay panel above can simulate "
+        "one alternative step, but it does not predict a full future episode."
+    )
 
     preset_questions = [
         f"Why did the agent choose '{chosen_name}' at step {current_step} instead of '{alt_name}'?",
@@ -282,11 +358,12 @@ def main():
         context_window = st.slider("Temporal Retrieval Window (± steps around target frame)", 0, 5, 2)
 
     if col_btn.button("🔍 Generate Grounded Explanation", type="primary", use_container_width=True):
-        with st.spinner(f"Retrieving telemetry slice around Step {current_step} and querying local Llama 3 model..."):
+        with st.spinner(f"Retrieving telemetry around Step {current_step} and querying local Qwen3 model..."):
             result = rag_client.answer_question(
                 user_query=user_query,
                 explicit_step=current_step,
-                window=context_window
+                window=context_window,
+                session_id=os.path.splitext(os.path.basename(selected_session_path))[0]
             )
 
         # Latency Metrics Banner
@@ -298,21 +375,40 @@ def main():
         exp_col, raw_col = st.columns([1.35, 1.0])
 
         with exp_col:
-            st.markdown("### 📋 Grounded Counterfactual Explanation")
-            st.markdown(result["explanation"])
+            st.markdown("### 📋 Grounded Policy Explanation")
+            if result.get("explanation_fallback"):
+                st.caption("Qwen's takeaway did not pass a grounding check; showing the verified telemetry summary.")
+                with st.expander("Qwen response diagnostics"):
+                    st.write(result.get("fallback_reason", "No rejection detail was recorded."))
+                    raw_response = result.get("raw_model_response", "")
+                    st.code(raw_response if raw_response else "(Qwen returned no response text.)")
+            st.markdown(result["explanation"].replace("\n", "  \n"))
 
         with raw_col:
-            st.markdown("### 🔬 Ground-Truth Verification Table")
+            st.markdown("### 🔬 Logged Telemetry Comparison")
             meta = {
+                "step": current_step,
                 "value_estimate": current_frame.get("value_estimate", 0.0),
                 "chosen_action_name": chosen_name
             }
-            audit = check_numerical_faithfulness(result["explanation"], meta, chosen_prob, alt_prob)
+            normalized_query = re.sub(r"[^a-z0-9]+", " ", user_query.casefold()).strip()
+            requested_alt_actions = []
+            for action_name, probability in probs.items():
+                normalized_action = re.sub(r"[^a-z0-9]+", " ", action_name.casefold()).strip()
+                if (action_name != chosen_name and normalized_action
+                        and re.search(rf"(?<!\w){re.escape(normalized_action)}(?!\w)", normalized_query)):
+                    requested_alt_actions.append((action_name, float(probability)))
+            if not requested_alt_actions and alt_name != "None":
+                requested_alt_actions = [(alt_name, alt_prob)]
+            requested_alt_probabilities = [probability for _, probability in requested_alt_actions]
+            audit = check_required_citations(
+                result["explanation"], meta, chosen_prob, requested_alt_probabilities
+            )
 
-            if audit["all_verified"]:
-                st.success("✅ **Faithfulness Verified:** Explanation accurately cites logged $V(s)$, chosen $\\pi(a\vert{}s)$, and alternative $\\pi(a\vert{}s)$ figures.")
+            if audit["all_required_figures_cited"]:
+                st.info("The answer includes the checked step, action, and key logged figures. This citation check does not validate the reasoning or any untested alternative outcome.")
             else:
-                st.info("ℹ️ **Ground-Truth Comparison:** Verify the generated explanation against the exact logged telemetry below.")
+                st.warning("Some expected step, action, or figure citations are missing. Compare the answer with the logged telemetry below.")
 
             verification_table = {
                 "Telemetry Parameter": [
@@ -321,6 +417,7 @@ def main():
                     "Executed Action Prob π(a|s)",
                     "Top Rejected Alternative",
                     "Rejected Alternative Prob π(a|s)",
+                    "Requested Alternative(s)",
                     "Critic Value Estimate V(s)",
                     "Immediate Step Reward",
                     "Agent Health (%)",
@@ -334,6 +431,10 @@ def main():
                     f"{chosen_prob:.4f} ({chosen_prob * 100:.1f}%)",
                     alt_name,
                     f"{alt_prob:.4f} ({alt_prob * 100:.1f}%)",
+                    "; ".join(
+                        f"{name}: {probability:.4f} ({probability * 100:.1f}%)"
+                        for name, probability in requested_alt_actions
+                    ) or "None identified",
                     f"{current_frame.get('value_estimate', 0.0):.4f}",
                     f"{current_frame.get('reward', 0.0):.4f}",
                     f"{agent_hp}%",

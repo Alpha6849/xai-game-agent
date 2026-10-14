@@ -1,4 +1,5 @@
 """2D combat arena simulation, independent of Gymnasium."""
+import copy
 import numpy as np
 import pygame
 
@@ -155,6 +156,69 @@ class ArenaSimulation:
         self.opp_strafe_timer = int(self.rng.integers(25, 60))
         self.projectiles = []
         self.tick = 0
+        self._refresh()
+
+    def capture_state(self):
+        """Return a JSON-serializable snapshot sufficient to replay one action."""
+        return {
+            "version": 1,
+            "width": self.width,
+            "height": self.height,
+            "rng_state": copy.deepcopy(self.rng.bit_generator.state),
+            "agent_pos": self.agent_pos.tolist(),
+            "opp_pos": self.opp_pos.tolist(),
+            "agent_health": float(self.agent_health),
+            "opp_health": float(self.opp_health),
+            "agent_ammo": int(self.agent_ammo),
+            "agent_cooldown": int(self.agent_cooldown),
+            "opp_cooldown": int(self.opp_cooldown),
+            "opp_strafe_dir": int(self.opp_strafe_dir),
+            "opp_strafe_timer": int(self.opp_strafe_timer),
+            "projectiles": [
+                {
+                    "x": float(projectile.x),
+                    "y": float(projectile.y),
+                    "vx": float(projectile.vx),
+                    "vy": float(projectile.vy),
+                    "owner_id": int(projectile.owner_id),
+                    "radius": int(projectile.radius),
+                    "active": bool(projectile.active),
+                }
+                for projectile in self.projectiles
+            ],
+            "tick": int(self.tick),
+        }
+
+    def restore_state(self, state):
+        """Restore a snapshot produced by capture_state()."""
+        if state.get("version") != 1:
+            raise ValueError("Unsupported or missing arena snapshot version")
+        if state.get("width") != self.width or state.get("height") != self.height:
+            raise ValueError("Arena snapshot dimensions do not match this simulation")
+
+        self.rng.bit_generator.state = copy.deepcopy(state["rng_state"])
+        self.agent_pos = np.asarray(state["agent_pos"], dtype=np.float32)
+        self.opp_pos = np.asarray(state["opp_pos"], dtype=np.float32)
+        self.agent_health = float(state["agent_health"])
+        self.opp_health = float(state["opp_health"])
+        self.agent_ammo = int(state["agent_ammo"])
+        self.agent_cooldown = int(state["agent_cooldown"])
+        self.opp_cooldown = int(state["opp_cooldown"])
+        self.opp_strafe_dir = int(state["opp_strafe_dir"])
+        self.opp_strafe_timer = int(state["opp_strafe_timer"])
+        self.projectiles = []
+        for data in state.get("projectiles", []):
+            projectile = Projectile(
+                data["x"], data["y"], data["vx"], data["vy"],
+                speed=float(np.hypot(data["vx"], data["vy"])),
+                owner_id=data["owner_id"]
+            )
+            projectile.vx = float(data["vx"])
+            projectile.vy = float(data["vy"])
+            projectile.radius = int(data["radius"])
+            projectile.active = bool(data["active"])
+            self.projectiles.append(projectile)
+        self.tick = int(state["tick"])
         self._refresh()
 
     def distance(self):

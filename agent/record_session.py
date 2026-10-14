@@ -33,15 +33,23 @@ def record_gameplay(model_path: str, episodes: int = 3, render: bool = False):
                     action=int(action),
                     reward=0.0,
                     done=False,
-                    step_idx=global_step
+                    step_idx=global_step,
+                    pre_action_state=env.capture_state()
                 )
 
-                next_obs, reward, terminated, truncated, _ = env.step(int(action))
+                next_obs, reward, terminated, truncated, transition_info = env.step(int(action))
                 done = terminated or truncated
 
                 # Update the last recorded frame with true transition outcome
-                callback.recorded_frames[-1].reward = float(reward)
-                callback.recorded_frames[-1].done = bool(done)
+                frame = callback.recorded_frames[-1]
+                frame.reward = float(reward)
+                frame.done = bool(done)
+                frame.next_observation = [float(value) for value in next_obs]
+                frame.transition_info = {
+                    **transition_info,
+                    "terminated": bool(terminated),
+                    "truncated": bool(truncated),
+                }
 
                 if render:
                     env.render()
