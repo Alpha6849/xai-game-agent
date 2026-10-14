@@ -105,7 +105,7 @@ xai-game-agent/
 
 ## ⚙️ Technical Specifications
 
-### 🎯 Observation Space (`spaces.Box(16,)`)
+###  Observation Space (`spaces.Box(16,)`)
 * `obs[0:2]`: Agent position coordinates $(x, y)$ normalized to $[0, 1]$.
 * `obs[2:4]`: Relative opponent displacement $(\Delta x, \Delta y)$ normalized to $[-1, 1]$.
 * `obs[4]`: Euclidean distance to opponent normalized to $[0, 1]$.
@@ -119,7 +119,7 @@ xai-game-agent/
 * `obs[13:15]`: Relative trajectory vector of nearest incoming threat projectile.
 * `obs[15]`: Incoming projectile threat active flag (`1.0` if threat present, `0.0` otherwise).
 
-### 🎮 Action Space (`spaces.Discrete(7)`)
+###  Action Space (`spaces.Discrete(7)`)
 * `0`: Move North (Translates position upward)
 * `1`: Move South (Translates position downward)
 * `2`: Move East (Rightward translation)
@@ -142,7 +142,7 @@ $$R_{\text{total}} = R_{\text{terminal}} + \sum R_{\text{shaping}}$$
 
 ---
 
-## 🚀 Installation & Setup
+## 📦 Installation & Setup
 
 ### 1. Prerequisites
 * Python 3.10 or 3.11
@@ -171,7 +171,7 @@ ollama pull llama3
 
 ---
 
-## 💻 Execution Workflow
+## 🕹️ Execution Workflow
 
 ### Step 1: Policy Training
 Train the agent using PPO with checkpointing and TensorBoard logging:
