@@ -1,12 +1,15 @@
 import time
+import uuid
 import argparse
 from stable_baselines3 import PPO
-from env.gym_wrapper import GymArenaEnv
+from env.gym_wrapper import CombatArenaEnv
 from agent.callbacks import TelemetryRecorderCallback
 from telemetry.logger import TelemetryLogger
 
+
 def record_gameplay(model_path: str, episodes: int = 3, render: bool = False):
-    env = GymArenaEnv()
+    render_mode = "human" if render else None
+    env = CombatArenaEnv(render_mode=render_mode)
     model = PPO.load(model_path)
     logger = TelemetryLogger()
     callback = TelemetryRecorderCallback()
@@ -14,46 +17,52 @@ def record_gameplay(model_path: str, episodes: int = 3, render: bool = False):
     print(f"Recording evaluation session for model: {model_path}")
     global_step = 0
 
-    for ep in range(episodes):
-        obs, _ = env.reset()
-        done = False
-        ep_step = 0
+    try:
+        for ep in range(episodes):
+            obs, _ = env.reset()
+            done = False
+            ep_step = 0
 
-        while not done:
-            action, _ = model.predict(obs, deterministic=False)
-            
-            # Extract internal signals BEFORE environment state transition occurs
-            callback.extract_and_record(
-                model=model,
-                obs=obs.reshape(1, -1),
-                action=action,
-                reward=0.0,
-                done=False,
-                step_idx=global_step
+            while not done:
+                action, _ = model.predict(obs, deterministic=False)
+
+                # Extract internal signals BEFORE environment state transition occurs
+                callback.extract_and_record(
+                    model=model,
+                    obs=obs,
+                    action=int(action),
+                    reward=0.0,
+                    done=False,
+                    step_idx=global_step
+                )
+
+                next_obs, reward, terminated, truncated, _ = env.step(int(action))
+                done = terminated or truncated
+
+                # Update the last recorded frame with true transition outcome
+                callback.recorded_frames[-1].reward = float(reward)
+                callback.recorded_frames[-1].done = bool(done)
+
+                if render:
+                    env.render()
+
+                obs = next_obs
+                ep_step += 1
+                global_step += 1
+
+            print(
+                f"Episode {ep + 1}/{episodes} concluded at episode step {ep_step} "
+                f"(Cumulative steps: {global_step})"
             )
 
-            next_obs, reward, terminated, truncated, _ = env.step(action)
-            done = terminated or truncated
+        logger.log_batch(callback.recorded_frames)
+        session_id = f"{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
+        saved_file = logger.flush_to_json(session_id=session_id)
+        print(f"Session telemetry successfully generated: {saved_file}")
 
-            # Update the last recorded frame with true transition outcome
-            callback.recorded_frames[-1].reward = float(reward)
-            callback.recorded_frames[-1].done = bool(done)
+    finally:
+        env.close()
 
-            if render:
-                env.render()
-
-            obs = next_obs
-            ep_step += 1
-            global_step += 1
-
-        print(f"Episode {ep + 1}/{episodes} concluded at episode step {ep_step} (Cumulative steps: {global_step})")
-
-    logger.log_batch(callback.recorded_frames)
-    session_id = str(int(time.time()))
-    saved_file = logger.flush_to_json(session_id=session_id)
-    print(f"Session telemetry successfully generated: {saved_file}")
-
-    env.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate Ground-Truth Telemetry Dataset")
