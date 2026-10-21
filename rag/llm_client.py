@@ -106,13 +106,16 @@ class ExplainableRAGClient:
         step_label = f"Step {step}" if step is not None else "Recorded decision"
         if alternative_name == "None":
             decision_line = (
-                f"Decision: {step_label}: {chosen_name} ({chosen_probability * 100:.1f}%) was selected; "
+                f"Decision: {step_label}: {chosen_name} (π(a|s)={chosen_probability:.6f}; "
+                f"{chosen_probability * 100:.1f}%) was selected; "
                 "no rejected alternative was recorded."
             )
         else:
             decision_line = (
-                f"Decision: {step_label}: {chosen_name} ({chosen_probability * 100:.1f}%) was selected; "
-                f"{alternative_name} ({alternative_probability * 100:.1f}%) was the named alternative."
+                f"Decision: {step_label}: {chosen_name} (π(a|s)={chosen_probability:.6f}; "
+                f"{chosen_probability * 100:.1f}%) was selected; "
+                f"{alternative_name} (π(a|s)={alternative_probability:.6f}; "
+                f"{alternative_probability * 100:.1f}%) was the named alternative."
             )
 
         def number_or_missing(value, digits=4):

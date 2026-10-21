@@ -7,7 +7,7 @@ import gymnasium as gym
 from gymnasium import spaces
 import pygame
 
-from env.arena import ACTION_NAMES, AGENT_COOLDOWN, AGENT_MAX_AMMO, ArenaSimulation
+from env.arena import ACTION_NAMES, AGENT_COOLDOWN, AGENT_MAX_AMMO, AMMO_REGEN_INTERVAL, ArenaSimulation
 
 OBS_FEATURE_NAMES = [
     "agent_x", "agent_y", "opp_rel_x", "opp_rel_y", "opp_distance",
@@ -31,14 +31,14 @@ LOSS_REWARD = -5.0
 class CombatArenaEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
 
-    def __init__(self, render_mode=None, max_steps=400):
+    def __init__(self, render_mode=None, max_steps=400, ammo_regen_interval=AMMO_REGEN_INTERVAL):
         super().__init__()
         if render_mode not in (None, *self.metadata["render_modes"]):
             raise ValueError(f"Unsupported render_mode {render_mode!r}")
         if not isinstance(max_steps, int) or max_steps <= 0:
             raise ValueError("max_steps must be a positive integer")
         self.render_mode = render_mode
-        self.sim = ArenaSimulation(width=600, height=600)
+        self.sim = ArenaSimulation(width=600, height=600, ammo_regen_interval=ammo_regen_interval)
         self.action_space = spaces.Discrete(len(ACTION_NAMES))
 
         low = np.array([0, 0, -1, -1, 0, 0, 0, 0, 0, 0, -1, -1, 0, -1, -1, 0], dtype=np.float32)
@@ -201,6 +201,13 @@ class CombatArenaEnv(gym.Env):
         opp_hud = hud_font.render(f"Opponent HP: {int(sim.opp_health)}", True, (180, 20, 20))
         canvas.blit(agent_hud, (15, 15))
         canvas.blit(opp_hud, (sim.width - 160, 15))
+        controls_font = pygame.font.SysFont(None, 18)
+        controls = controls_font.render(
+            "Click window | WASD/Arrows: move | Space: shoot | C: cover | R: retreat | Q: quit",
+            True,
+            (35, 35, 35),
+        )
+        canvas.blit(controls, (15, sim.height - 24))
 
         if self.render_mode == "human":
             if self.window is None:

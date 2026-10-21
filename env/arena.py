@@ -63,13 +63,18 @@ class Projectile:
 
 
 class ArenaSimulation:
-    def __init__(self, width=600, height=600, rng=None):
+    def __init__(self, width=600, height=600, rng=None, ammo_regen_interval=AMMO_REGEN_INTERVAL):
         self.width, self.height = int(width), int(height)
         if self.width < 420 or self.height < 420:
             raise ValueError(
                 "Arena width and height must be at least 420 pixels to support obstacle and spawn margins."
             )
         self.rng = rng if rng is not None else np.random.default_rng()
+        if ammo_regen_interval is not None and (
+            not isinstance(ammo_regen_interval, int) or ammo_regen_interval <= 0
+        ):
+            raise ValueError("ammo_regen_interval must be a positive integer or None")
+        self.ammo_regen_interval = ammo_regen_interval
         self.obstacles = [
             Obstacle(250, 220, 100, 160),
             Obstacle(100, 100, 60, 60),
@@ -316,7 +321,7 @@ class ArenaSimulation:
         self.tick += 1
         self.agent_cooldown = max(0, self.agent_cooldown - 1)
         self.opp_cooldown = max(0, self.opp_cooldown - 1)
-        if self.tick % AMMO_REGEN_INTERVAL == 0:
+        if self.ammo_regen_interval is not None and self.tick % self.ammo_regen_interval == 0:
             self.agent_ammo = min(AGENT_MAX_AMMO, self.agent_ammo + 1)
         self._agent_act(action, events)
         self._opponent_act(events)
